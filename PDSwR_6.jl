@@ -57,36 +57,35 @@ outcomes = [:churn, :appetency, :upselling]
 # Find independent variable names
 vars = setdiff(names(df), outcomes, [:rgroup])
 
+# Find column types: coltypes
+coltypes = Missings.T.(eltypes(df))
+
+# Identify which features are categorical variables.
+catvars = coltypes .== String
+
+# Identify which features are numeric variables.
+numvars = (coltypes .== Int64) .| (coltypes .== Float64)
 
 # --------------------------------------------------------------------------
 # CONVERSION COMPLETE UNTIL THIS POINT
 # --------------------------------------------------------------------------
 
-Missings.T(eltype(df[:Var1]))
-
-# Identify which features are categorical variables.
-                  # catVars <- vars[sapply(dTrainAll[,vars],class) %in%
-                  #    c('factor','character')] 	# Note: 9
-
-#   Identify which features are numeric variables.
-#numericVars <- vars[sapply(dTrainAll[,vars],class) %in% c('numeric','integer')]
-
 # #   Remove unneeded objects from workspace.
 # #                  rm(list=c('d','churn','appetency','upselling')) 	# Note: 11
-#
-# # Note 12:
-# #   Choose which outcome to model (churn).
-# #                  outcome <- 'churn' 	# Note: 12
-#
-# # Note 13:
-# #   Choose which outcome is considered
-# #   positive.
-# pos <- '1' 	# Note: 13
-#
+churn, appetency, upselling = nothing
+gc()
+
+# Choose which outcome to model (churn): outcome
+outcome = :churn
+
+# Choose which outcome is considered positive: pos
+pos <- '1'
+
 # # Note 14:
 # #   Further split training data into training and
 # #   calibration.
 # useForCal <- rbinom(n=dim(dTrainAll)[[1]],size=1,prob=0.1)>0 	# Note: 14
+
 # dCal <- subset(dTrainAll,useForCal)
 # dTrain <- subset(dTrainAll,!useForCal)
 
