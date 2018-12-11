@@ -15,6 +15,7 @@
 using CSV
 using DataFrames
 using DataFramesMeta
+using Missings
 using Random
 
 # Set random seed, 'LEGO' turned 180 degrees
@@ -56,12 +57,12 @@ outcomes = [:churn, :appetency, :upselling]
 # Find independent variable names
 vars = setdiff(names(df), outcomes, [:rgroup])
 
-typeof(df[:Var1])
-eltypes(df)
 
 # --------------------------------------------------------------------------
 # CONVERSION COMPLETE UNTIL THIS POINT
 # --------------------------------------------------------------------------
+
+Missings.T(eltype(df[:Var1]))
 
 # Identify which features are categorical variables.
                   # catVars <- vars[sapply(dTrainAll[,vars],class) %in%
