@@ -1,0 +1,137 @@
+---
+title: "6 Memorisation Methods"
+author: "Morten Ørris Poulsen"
+date: "23/5/2018"
+output:
+  html_document:
+    theme: yeti
+---
+
+Working through chapter 6 in Practical Data Science with R to convert to tidyverse where possible and sensible.
+
+```{r setup}
+
+```
+
+```{r setup-tidy, message = FALSE}
+library(readr)    # Read TSV files directly into tibbles
+library(dplyr)    # For data wrangling
+```
+
+```{r prepare-data}
+# KDD and KDD Cup 2009 : Getting started with KDD Cup 2009 data. All data from https://github.com/WinVector/zmPDSwR/tree/master/KDD2009.
+
+# Read the file of independent variables: d
+d <- read.table('./datasets/orange_small_train.data',
+                header=T,
+                sep='\t',
+                na.strings=c('NA','')) 	# Treat NA and the empty string as missing data
+
+# Read churn dependent variable: churn
+churn <- read.table('./datasets/orange_small_train_churn.labels.txt', header=F, sep='\t')
+
+# Add churn as a new column. 
+d$churn <- churn$V1
+
+# Read appentency: appetency
+appetency <- read.table('./datasets/orange_small_train_appetency.labels.txt', header=F, sep='\t')
+
+#   Add appetency as a new column. 
+d$appetency <- appetency$V1
+
+# Read upselling: upselling
+upselling <- read.table('./datasets/orange_small_train_upselling.labels.txt', header=F, sep='\t')
+
+# Add upselling as a new column
+d$upselling <- upselling$V1
+
+# Make work reproducible
+set.seed(729375)
+
+d$rgroup <- runif(dim(d)[[1]])
+
+#   Split data into train and test subsets. 
+dTrainAll <- subset(d,rgroup<=0.9)
+dTest <- subset(d,rgroup>0.9)
+
+outcomes=c('churn','appetency','upselling')
+vars <- setdiff(colnames(dTrainAll), c(outcomes,'rgroup'))
+
+# Identify which features are categorical variables. 
+catVars <- vars[sapply(dTrainAll[,vars],class) %in%
+   c('factor','character')]
+
+# Identify which features are numeric variables. 
+numericVars <- vars[sapply(dTrainAll[,vars],class) %in%
+   c('numeric','integer')] 
+
+# Remove unneeded objects from workspace. 
+rm(list=c('d','churn','appetency','upselling'))
+
+# Choose which outcome to model (churn): outcome
+outcome <- 'churn'
+
+# Choose which outcome is considered positive: pos
+pos <- '1'
+
+# Further split training data into training and calibration.
+useForCal <- rbinom(n = dim(dTrainAll)[[1]], size = 1, prob = 0.1) > 0
+dCal <- subset(dTrainAll, useForCal)
+dTrain <- subset(dTrainAll, !useForCal)
+```
+
+```{r prepare-data-tidy}
+# Read the file of independent variables: d_tidy
+# read_tsv automatically treats NA and the empty string as missing data
+d_tidy <- readr::read_tsv('./datasets/orange_small_train.data')
+
+# Read churn dependent variable: churn_tidy
+churn_tidy <- readr::read_tsv('./datasets/orange_small_train_churn.labels.txt',
+                              col_names = FALSE)
+
+# Read appentency: appetency
+appetency_tidy <- readr::read_tsv('./datasets/orange_small_train_appetency.labels.txt',
+                                  col_names = FALSE)
+
+# Read upselling: upselling
+upselling_tidy <- readr::read_tsv('./datasets/orange_small_train_upselling.labels.txt',
+                                  col_names = FALSE)
+
+# Add churn, appetency and upselling as a new columns: df
+df <- dplyr::bind_cols(d_tidy, churn_tidy, appetency_tidy, upselling_tidy)
+
+# Make work reproducible
+set.seed(729375)
+
+d$rgroup <- runif(dim(d)[[1]])
+
+#   Split data into train and test subsets. 
+dTrainAll <- subset(d,rgroup<=0.9)
+dTest <- subset(d,rgroup>0.9)
+
+outcomes=c('churn','appetency','upselling')
+vars <- setdiff(colnames(dTrainAll), c(outcomes,'rgroup'))
+
+# Identify which features are categorical variables. 
+catVars <- vars[sapply(dTrainAll[,vars],class) %in%
+   c('factor','character')]
+
+# Identify which features are numeric variables. 
+numericVars <- vars[sapply(dTrainAll[,vars],class) %in%
+   c('numeric','integer')] 
+
+# Remove unneeded objects from workspace. 
+rm(list=c('d','churn','appetency','upselling'))
+
+# Choose which outcome to model (churn): outcome
+outcome <- 'churn'
+
+# Choose which outcome is considered positive: pos
+pos <- '1'
+
+# Further split training data into training and calibration.
+useForCal <- rbinom(n = dim(dTrainAll)[[1]], size = 1, prob = 0.1) > 0
+dCal <- subset(dTrainAll, useForCal)
+dTrain <- subset(dTrainAll, !useForCal)
+
+```
