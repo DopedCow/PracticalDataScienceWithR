@@ -14,6 +14,7 @@
 
 using CSV
 using DataFrames
+using DataFramesMeta
 using Random
 
 # Set random seed, 'LEGO' turned 180 degrees
@@ -37,37 +38,56 @@ appetency = CSV.read("./data/orange_small_train_appetency.labels.txt", header = 
 # Read upselling dependent variable: upselling
 upselling = CSV.read("./data/orange_small_train_upselling.labels.txt", header = false)
 
+# Split data into train and test subsets.
+rgroup = rand(nrow(df))
+
 # Concatenate independent and depedent variables into one dataframe: df
-df = hcat(df, churn, appetency, upselling)
+df = hcat(df, churn, appetency, upselling, rgroup)
 
 # Rename columns
 DataFrames.rename!(df, :Column1 => :churn, :Column1_1 => :appetency,
-                  :Column1_2 => :upselling)
+                  :Column1_2 => :upselling, :x1 => :rgroup)
 
-                  # Note 8:
-                  #   Split data into train and test subsets.
+train_all = @where(df, :rgroup .<= 0.9)
+test = @where(df, rgroup .> 0.9)
 
-                  # Note 9:
-                  #   Identify which features are categorical
-                  #   variables.
+outcomes = [:churn, :appetency, :upselling]
 
-                  # Note 10:
-                  #   Identify which features are numeric
-                  #   variables.
+# Find independent variable names
+vars = setdiff(names(df), outcomes, [:rgroup])
 
-                  # Note 11:
-                  #   Remove unneeded objects from workspace.
+typeof(df[:Var1])
+eltypes(df)
 
-                  # Note 12:
-                  #   Choose which outcome to model (churn).
+# --------------------------------------------------------------------------
+# CONVERSION COMPLETE UNTIL THIS POINT
+# --------------------------------------------------------------------------
 
-                  # Note 13:
-                  #   Choose which outcome is considered
-                  #   positive.
+# Identify which features are categorical variables.
+                  # catVars <- vars[sapply(dTrainAll[,vars],class) %in%
+                  #    c('factor','character')] 	# Note: 9
 
-                  # Note 14:
-                  #   Further split training data into training and
-                  #   calibration.
+#   Identify which features are numeric variables.
+#numericVars <- vars[sapply(dTrainAll[,vars],class) %in% c('numeric','integer')]
+
+# #   Remove unneeded objects from workspace.
+# #                  rm(list=c('d','churn','appetency','upselling')) 	# Note: 11
+#
+# # Note 12:
+# #   Choose which outcome to model (churn).
+# #                  outcome <- 'churn' 	# Note: 12
+#
+# # Note 13:
+# #   Choose which outcome is considered
+# #   positive.
+# pos <- '1' 	# Note: 13
+#
+# # Note 14:
+# #   Further split training data into training and
+# #   calibration.
+# useForCal <- rbinom(n=dim(dTrainAll)[[1]],size=1,prob=0.1)>0 	# Note: 14
+# dCal <- subset(dTrainAll,useForCal)
+# dTrain <- subset(dTrainAll,!useForCal)
 
 
 # --------------------------------------------------------------------------
@@ -75,22 +95,6 @@ DataFrames.rename!(df, :Column1 => :churn, :Column1_1 => :appetency,
 
 # Original R Code ----------------------------------------------------------
 
-d$rgroup <- runif(dim(d)[[1]])
-dTrainAll <- subset(d,rgroup<=0.9)
-dTest <- subset(d,rgroup>0.9) 	# Note: 8
-outcomes=c('churn','appetency','upselling')
-vars <- setdiff(colnames(dTrainAll),
-   c(outcomes,'rgroup'))
-catVars <- vars[sapply(dTrainAll[,vars],class) %in%
-   c('factor','character')] 	# Note: 9
-numericVars <- vars[sapply(dTrainAll[,vars],class) %in%
-   c('numeric','integer')] 	# Note: 10
-rm(list=c('d','churn','appetency','upselling')) 	# Note: 11
-outcome <- 'churn' 	# Note: 12
-pos <- '1' 	# Note: 13
-useForCal <- rbinom(n=dim(dTrainAll)[[1]],size=1,prob=0.1)>0 	# Note: 14
-dCal <- subset(dTrainAll,useForCal)
-dTrain <- subset(dTrainAll,!useForCal)
 
 
 
