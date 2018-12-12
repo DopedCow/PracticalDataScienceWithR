@@ -19,6 +19,7 @@ using DataFrames
 using DataFramesMeta
 using FreqTables
 using Missings
+using NamedArrays
 using Random
 using StatsBase
 
@@ -79,7 +80,7 @@ numvars = (coltypes .== Int64) .| (coltypes .== Float64)
 outcome = :churn
 
 # Choose which outcome is considered positive: pos
-pos = '1'
+pos = 1
 
 # Split training data into training and calibration: callibration, train
 callibration = @where(train_all, :rgroup .> 0.8)
@@ -101,66 +102,64 @@ table218[:, 2] ./ (table218[:, 1] .+ table218[:, 2])
 # --------------------------------------------------------------------------
 
 
+# Make single-variable model function --------------------------------------
+
+# Function to build single-variable models for categorical variables: mkPredC()
+outcol = [1,1,1,missing,0,0,1]
+varcol = [1,1,missing,0,0,missing, missing]
+
+ppos = sum(skipmissing(outcol .== pos)) / length(outcol)
+
+table_missing = freqtable(outcol[ismissing.(varcol)])
+pposwmissing = (table_missing ./ sum(table_missing))[2]
+
+table_var = freqtable(outcol, varcol)
+pposwvar = Array(table_var[2, :] .+ 1.0e-3 * ppos) ./ (sum(Array(table_var), dims = 1) .+ 1.0e-3)
+# pPosWv <- (vTab[pos,]+1.0e-3*pPos)/(colSums(vTab)+1.0e-3)
+
+(table_var[2, :] .+ 1.0e-3 * ppos)
+(sum(Array(table_var), dims = 1) .+ 1.0e-3)
+
+
+
+mkPredC = function(outcol, varcol, appcol)
+    # Given a vector of training outcomes, outcol, a categorical training
+    # variable, varcol, and a prediction variable, appcol, use outcol and
+    # varcol to build a single-variable model and then apply the model to
+    # appcol to get new predictions.
+
+    # Get stats on how often outcome is positive during training
+    ppos = sum(skipmissing(outcol .== pos)) / length(outcol)
+
+    # Get stats on how often outcome is positive for missing values of
+    # variable during training.
+    # TODO Fix so '2' is replaced by pos
+    table_missing = freqtable(outcol[ismissing.(varcol)])
+    pposwmissing = (table_missing ./ sum(table_missing))[2]
+
+    # Get stats on how often outcome is positive, conditioned on levels
+    # of training variable.
+    table_var = freqtable(outcol, varcol)
+    # vTab <- table(as.factor(outCol),varCol)
+    # pPosWv <- (vTab[pos,]+1.0e-3*pPos)/(colSums(vTab)+1.0e-3)
+
+    # Make predictions by looking up levels of appcol
+    # pred <- pPosWv[appCol]
+
+    # Add in predictions for NA levels of appCol
+    # pred[is.na(appCol)] <- pPosWna
+
+    # Add in predictions for levels of appCol that weren’t known during training
+    pred[ismissing(pred)] .= ppos
+    # pred[is.na(pred)] <- pPos
+
+    pred  # return vector of predictions
+end
+
+
 # --------------------------------------------------------------------------
 # Original R Code ----------------------------------------------------------
 # --------------------------------------------------------------------------
-
-
-# --------------------------------------------------------------------------
-# (example 6.4 of section 6.2.1)  : Memorization methods : Building single-variable models : Using categorical features
-
-# Function to build single-variable models for categorical variables: mkPredC()
-
-mkPredC = function(outcol, carcol, appcol)
-    # body
-end
-
-mkPredC <- function(outCol,varCol,appCol) { 	# Note: 1
-   pPos <- sum(outCol==pos)/length(outCol) 	# Note: 2
-   naTab <- table(as.factor(outCol[is.na(varCol)]))
-   pPosWna <- (naTab/sum(naTab))[pos] 	# Note: 3
-   vTab <- table(as.factor(outCol),varCol)
-   pPosWv <- (vTab[pos,]+1.0e-3*pPos)/(colSums(vTab)+1.0e-3) 	# Note: 4
-   pred <- pPosWv[appCol] 	# Note: 5
-   pred[is.na(appCol)] <- pPosWna 	# Note: 6
-   pred[is.na(pred)] <- pPos 	# Note: 7
-   pred 	# Note: 8
-}
-
-# Note 1:
-#   Given a vector of training outcomes (outCol),
-#   a categorical training variable (varCol), and a
-#   prediction variable (appCol), use outCol and
-#   varCol to build a single-variable model and then
-#   apply the model to appCol to get new
-#   predictions.
-
-# Note 2:
-#   Get stats on how often outcome is positive
-#   during training.
-
-# Note 3:
-#   Get stats on how often outcome is positive for
-#   NA values of variable during training.
-
-# Note 4:
-#   Get stats on how often outcome is positive,
-#   conditioned on levels of training variable.
-
-# Note 5:
-#   Make predictions by looking up levels of
-#   appCol.
-
-# Note 6:
-#   Add in predictions for NA levels of
-#   appCol.
-
-# Note 7:
-#   Add in predictions for levels of appCol that
-#   weren’t known during training.
-
-# Note 8:
-#   Return vector of predictions.
 
 
 # --------------------------------------------------------------------------
