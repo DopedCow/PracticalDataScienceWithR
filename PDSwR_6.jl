@@ -7,8 +7,7 @@
 # --------------------------------------------------------------------------
 
 
-# TODO Cleanup notes so they become proper comments
-# TODO Find out how to treat NA as missings in CSV.read()
+# TODO Find out how to treat "NA" as missings in CSV.read()
 # TODO Find out if there is a function to clear variables from the workspace
 
 
@@ -76,7 +75,7 @@ numvars = (coltypes .== Int64) .| (coltypes .== Float64)
 
 # TODO Remove unneeded objects from workspace
 
-# Choose which outcome to model (churn): outcome
+# TODO NEEDED? Choose which outcome to model (churn): outcome
 outcome = :churn
 
 # Choose which outcome is considered positive: pos
@@ -92,8 +91,9 @@ train = @where(train_all, :rgroup .<= 0.8)
 # Calculate frequency table for Var218 split by churn
 table218 = FreqTables.freqtable(train, :Var218, :churn)
 
-# --------------------------------------------------------------------------
-# Title: Churn rates grouped by variable 218 codes
+# Calculate Var218 churn rates ---------------------------------------------
+
+# Churn rates grouped by variable 218 codes
 table218[:, 2] ./ (table218[:, 1] .+ table218[:, 2])
 
 
@@ -105,8 +105,9 @@ table218[:, 2] ./ (table218[:, 1] .+ table218[:, 2])
 # Make single-variable model function --------------------------------------
 
 # Function to build single-variable models for categorical variables: mkPredC()
-outcol = [1,1,1,missing,0,0,1]
-varcol = [1,1,missing,0,0,missing, missing]
+outcol = [1, 1, 1, missing, 0, 0, 1]
+varcol = [1, 1, missing, 0, 0, missing, missing]
+appcol = [missing, 0, 1, 1, 0, 1, 1]
 
 ppos = sum(skipmissing(outcol .== pos)) / length(outcol)
 
@@ -114,12 +115,20 @@ table_missing = freqtable(outcol[ismissing.(varcol)])
 pposwmissing = (table_missing ./ sum(table_missing))[2]
 
 table_var = freqtable(outcol, varcol)
-pposwvar = Array(table_var[2, :] .+ 1.0e-3 * ppos) ./ (sum(Array(table_var), dims = 1) .+ 1.0e-3)
+pposwvar = Array(table_var[2, :] .+ 1.0e-3 * ppos) / (sum(Array(table_var), dims = 1) .+ 1.0e-3)
 # pPosWv <- (vTab[pos,]+1.0e-3*pPos)/(colSums(vTab)+1.0e-3)
+Array(table_var[2, :] .+ 1.0e-3 * ppos)
+(sum(Array(table_var), dims = 1) .+ 1.0e-3)
+
+# Make predictions by looking up levels of appcol
+# pred <- pPosWv[appCol]
+
+# Add in predictions for NA levels of appCol
+# pred[is.na(appCol)] <- pPosWna
 
 (table_var[2, :] .+ 1.0e-3 * ppos)
 (sum(Array(table_var), dims = 1) .+ 1.0e-3)
-
+pred[ismissing(pred)] .= ppos
 
 
 mkPredC = function(outcol, varcol, appcol)
@@ -287,9 +296,8 @@ ggplot(data=dCal) +
 > aucs <- replicate(100,fCross())
 
 
-# --------------------------------------------------------------------------
+# Basic variable selection --------------------------------------------------
 # (example 6.11 of section 6.3.1)  : Memorization methods : Building models using many variables : Variable selection
-# Title: Basic variable selection
 
 # Define a convenience function to compute log likelihood.
 logLikelyhood <- function(outCol,predCol) {
@@ -359,9 +367,8 @@ for(v in numericVars) {
 ## [1] "predVar144, calibrationScore: 13.9858"
 ## [1] "predVar189, calibrationScore: 40.3059"
 
-# --------------------------------------------------------------------------
+# Build a bad decision tree -------------------------------------------------
 # (example 6.13 of section 6.3.2)  : Memorization methods : Building models using many variables : Using decision trees
-# Title: Building a bad decision tree
 
 > library('rpart')
 > fV <- paste(outcome,'>0 ~ ',
@@ -374,9 +381,8 @@ for(v in numericVars) {
 > print(calcAUC(predict(tmodel,newdata=dCal),dCal[,outcome]))
 [1] 0.5126917
 
-# --------------------------------------------------------------------------
+# Build another bad decision tree -------------------------------------------
 # (example 6.14 of section 6.3.2)  : Memorization methods : Building models using many variables : Using decision trees
-# Title: Building another bad decision tree
 
 > tVars <- paste('pred',c(catVars,numericVars),sep='')
 > fV2 <- paste(outcome,'>0 ~ ',paste(tVars,collapse=' + '),sep='')
@@ -403,9 +409,8 @@ for(v in numericVars) {
 > print(calcAUC(predict(tmodel,newdata=dCal),dCal[,outcome]))
 [1] 0.547967
 
-# --------------------------------------------------------------------------
+# Build a better decision tree ----------------------------------------------
 # (example 6.16 of section 6.3.2)  : Memorization methods : Building models using many variables : Using decision trees
-# Title: Building a better decision tree
 
 f <- paste(outcome,'>0 ~ ',paste(selVars,collapse=' + '),sep='')
 > tmodel <- rpart(f,data=dTrain,
@@ -419,9 +424,8 @@ f <- paste(outcome,'>0 ~ ',paste(selVars,collapse=' + '),sep='')
 > print(calcAUC(predict(tmodel,newdata=dCal),dCal[,outcome]))
 [1] 0.6669301
 
-# --------------------------------------------------------------------------
+# Print the decision tree ---------------------------------------------------
 # (example 6.17 of section 6.3.2)  : Memorization methods : Building models using many variables : Using decision trees
-# Title: Printing the decision tree
 
 > print(tmodel)
 n= 40518
@@ -451,27 +455,36 @@ node), split, n, deviance, yval
 62) predVar189< 0.06775545 1031  102.9486 0.11251210 *
 63) predVar189>=0.06775545 3606  558.5871 0.19162510 *
 
-# --------------------------------------------------------------------------
+# Plot the decision tree ----------------------------------------------------
 # (example 6.18 of section 6.3.2)  : Memorization methods : Building models using many variables : Using decision trees
-# Title: Plotting the decision tree
 
 par(cex=0.7)
 plot(tmodel)
 text(tmodel)
 
-# --------------------------------------------------------------------------
-# (example 6.19 of section 6.3.3)  : Memorization methods : Building models using many variables : Using nearest neighbor methods
-# Title: Running k-nearest neighbors
 
-> library('class')
-> nK <- 200
-> knnTrain <- dTrain[,selVars]  	# Note: 1
-> knnCl <- dTrain[,outcome]==pos 	# Note: 2
-> knnPred <- function(df) { 	# Note: 3
- knnDecision <- knn(knnTrain,df,knnCl,k=nK,prob=T)
- ifelse(knnDecision==TRUE, 	# Note: 4
-    attributes(knnDecision)$prob,
-    1-(attributes(knnDecision)$prob))
+# Run k-nearest neighbors ---------------------------------------------------
+# (example 6.19 of section 6.3.3)  : Memorization methods : Building models using many variables : Using nearest neighbor methods
+
+library('class')
+nK <- 200
+
+# Build a data frame with only the variables we wish to use for classification
+knnTrain <- dTrain[,selVars]
+
+# Build a vector with the known training outcomes
+knnCl <- dTrain[,outcome]==pos
+
+# Bind the knn() training function with our data in a new function.
+knnPred <- function(df) {
+    knnDecision <- knn(knnTrain,df,knnCl,k=nK,prob=T)
+
+    # Convert knn’s unfortunate convention of calculating probability as
+    # “proportion of the votes for the winning class” into the more
+    # useful “calculated probability of being a positive example.”
+    ifelse(knnDecision==TRUE,
+           attributes(knnDecision)$prob,
+           1-(attributes(knnDecision)$prob))
 }
 > print(calcAUC(knnPred(dTrain[,selVars]),dTrain[,outcome]))
 [1] 0.7443927
@@ -480,38 +493,17 @@ text(tmodel)
 > print(calcAUC(knnPred(dTest[,selVars]),dTest[,outcome]))
 [1] 0.718256
 
-# Note 1:
-#   Build a data frame with only the variables we
-#   wish to use for classification.
 
-# Note 2:
-#   Build a vector with the known training
-#   outcomes.
-
-# Note 3:
-#   Bind the knn() training function with our data
-#   in a new function.
-
-# Note 4:
-#   Convert knn’s unfortunate convention of
-#   calculating probability as “proportion of the
-#   votes for the winning class” into the more useful
-#   “calculated probability of being a positive
-#   example.”
-
-
-# --------------------------------------------------------------------------
+# Plot 200-nearest neighbor performance ------------------------------------
 # (example 6.20 of section 6.3.3)  : Memorization methods : Building models using many variables : Using nearest neighbor methods
-# Title: Platting 200-nearest neighbor performance
 
 dCal$kpred <- knnPred(dCal[,selVars])
 ggplot(data=dCal) +
 geom_density(aes(x=kpred,
    color=as.factor(churn),linetype=as.factor(churn)))
 
-# --------------------------------------------------------------------------
+# Plot receiver operating characteristic (ROC) curve ------------------------
 # (example 6.21 of section 6.3.3)  : Memorization methods : Building models using many variables : Using nearest neighbor methods
-# Title: Plotting the receiver operating characteristic curve
 
 plotROC <- function(predcol,outcol) {
   perf <- performance(prediction(predcol,outcol==pos),'tpr','fpr')
@@ -524,9 +516,8 @@ plotROC <- function(predcol,outcol) {
 }
 print(plotROC(knnPred(dTest[,selVars]),dTest[,outcome]))
 
-# --------------------------------------------------------------------------
-# (example 6.22 of section 6.3.3)  : Memorization methods : Building models using many variables : Using nearest neighbor methods
-# Title: Plotting the performance of a logistic regression model
+
+# Plot performance of logistic regression model -----------------------------
 
 > gmodel <- glm(as.formula(f),data=dTrain,family=binomial(link='logit'))
 > print(calcAUC(predict(gmodel,newdata=dTrain),dTrain[,outcome]))
@@ -536,28 +527,47 @@ print(plotROC(knnPred(dTest[,selVars]),dTest[,outcome]))
 > print(calcAUC(predict(gmodel,newdata=dCal),dCal[,outcome]))
 [1] 0.7170824
 
-# --------------------------------------------------------------------------
-# (example 6.23 of section 6.3.4)  : Memorization methods : Building models using many variables : Using Naive Bayes
-# Title: Building, applying, and evaluating a Naive Bayes model
+# Build, apply and evaluate a Naïve Bayes model -----------------------------
 
 pPos <- sum(dTrain[,outcome]==pos)/length(dTrain[,outcome])
-nBayes <- function(pPos,pf) { 	# Note: 1
+
+# Define a function that performs the Naïve Bayes prediction.
+nBayes <- function(pPos,pf) {
   pNeg <- 1 - pPos
   smoothingEpsilon <- 1.0e-5
+
+  # For each row, compute (with a smoothing term) the sum of
+  # log(P[positive & evidence_i]/P[positive]) across all columns. This
+  # is equivalent to the log of the product of P[evidence_i | positive]
+  # up to terms that don’t depend on the positive/negative outcome.
   scorePos <- log(pPos + smoothingEpsilon) +
-     rowSums(log(pf/pPos + smoothingEpsilon)) 	# Note: 2
+     rowSums(log(pf/pPos + smoothingEpsilon))
+
+  # For each row, compute (with a smoothing term) the sum of
+  # log(P[negative & evidence_i]/P[negative]) across all columns. This
+  # is equivalent to the log of the product of P[evidence_i | negative]
+  # up to terms that don’t depend on the positive/negative outcome.
   scoreNeg <- log(pNeg + smoothingEpsilon) +
-     rowSums(log((1-pf)/(1-pPos) + smoothingEpsilon)) 	# Note: 3
+     rowSums(log((1-pf)/(1-pPos) + smoothingEpsilon))
   m <- pmax(scorePos,scoreNeg)
   expScorePos <- exp(scorePos-m)
-  expScoreNeg <- exp(scoreNeg-m) 	# Note: 4
-  expScorePos/(expScorePos+expScoreNeg) 	# Note: 5
+
+  # Exponentiate to turn sums back into products, but make sure we don’t
+  # cause a floating point overflow in doing so.
+  expScoreNeg <- exp(scoreNeg-m)
+
+  # Use the fact that the predicted positive probability plus the
+  # predicted negative probability should sum to 1.0 to find and
+  # eliminate Z. Return the correctly scaled predicted odds of being
+  # positive as our forecast.
+  expScorePos/(expScorePos+expScoreNeg)
 }
 pVars <- paste('pred',c(numericVars,catVars),sep='')
 dTrain$nbpredl <- nBayes(pPos,dTrain[,pVars])
 dCal$nbpredl <- nBayes(pPos,dCal[,pVars])
-dTest$nbpredl <- nBayes(pPos,dTest[,pVars]) 	# Note: 6
 
+# Apply the function to make the predictions.
+dTest$nbpredl <- nBayes(pPos,dTest[,pVars])
 
 # Calculate the AUCs. Notice the overfit—fantastic performance on the training set that isn’t repeated on the calibration or test sets.
 print(calcAUC(dTrain$nbpredl,dTrain[,outcome]))
@@ -567,46 +577,8 @@ print(calcAUC(dCal$nbpredl,dCal[,outcome]))
 print(calcAUC(dTest$nbpredl,dTest[,outcome]))
 ## [1] 0.5956515
 
-# Note 1:
-#   Define a function that performs the Naive
-#   Bayes prediction.
 
-# Note 2:
-#   For each row, compute (with a smoothing term)
-#   the sum of log(P[positive &
-#   evidence_i]/P[positive]) across all columns. This
-#   is equivalent to the log of the product of
-#   P[evidence_i | positive] up to terms that don’t
-#   depend on the positive/negative outcome.
-
-# Note 3:
-#   For each row, compute (with a smoothing term)
-#   the sum of log(P[negative &
-#   evidence_i]/P[negative]) across all columns. This
-#   is equivalent to the log of the product of
-#   P[evidence_i | negative] up to terms that don’t
-#   depend on the positive/negative outcome.
-
-# Note 4:
-#   Exponentiate to turn sums back into products,
-#   but make sure we don’t cause a floating point
-#   overflow in doing so.
-
-# Note 5:
-#   Use the fact that the predicted positive
-#   probability plus the predicted negative
-#   probability should sum to 1.0 to find and
-#   eliminate Z. Return the correctly scaled predicted
-#   odds of being positive as our forecast.
-
-# Note 6:
-#   Apply the function to make the predictions.
-
-
-# --------------------------------------------------------------------------
-# (example 6.24 of section 6.3.4)  : Memorization methods : Building models using many variables : Using Naive Bayes
-# Title: Using a Naive Bayes package
-
+# Use a Naïve Bayes package -------------------------------------------------
 library('e1071')
 lVars <- c(catVars,numericVars)
 ff <- paste('as.factor(',outcome,'>0) ~ ',
